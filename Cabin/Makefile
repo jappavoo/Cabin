@@ -6,7 +6,8 @@ BOARD_TAG    = uno
 MONITOR_PORT = /dev/tty.usbmodemfd121
 
 USER_LIB_PATH := $(realpath ../Libraries)
-ARDUINO_LIBS = SoftwareSerial OneWire DallasTemperature ReedSwitch
+ARDUINO_LIBS = SoftwareSerial OneWire DallasTemperature \
+               ReedSwitch MotionDetector RemotePower
 
 
 include $(ARDMK_DIR)/arduino-mk/Arduino.mk

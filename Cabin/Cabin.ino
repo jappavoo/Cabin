@@ -9,11 +9,13 @@
 #include <DallasTemperature.h>
 
 #define __REED_SWITCHES__
+#define __MOTION_DETECTOR__
+#define __REMOTE_POWER__
 
 enum PINS {  
   REMOTE_POWER_HEAT_ON_PIN=2, 
   REMOTE_POWER_HEAT_OFF_PIN=3,
-  PIR_PIN=4,
+  MOTION_DETECTOR_PIN=4,
   FRONT_DOOR_PIN=5,
   SLIDING_DOOR_PIN=6,
   ENTRY_WINDOW_PIN=11,
@@ -44,9 +46,18 @@ class ReedSwitch FD(FRONT_DOOR_PIN, "FD" ),
   KW(KITCHEN_WINDOW_PIN, "KW"),
   LW(LIVINGROOM_WINDOW_PIN, "LW");
 
+#include <MotionDetector.h>
+class MotionDetector theMotionDetector(MOTION_DETECTOR_PIN);
+
+#include <RemotePower.h>
+class RemotePower theRemoteHeat(REMOTE_POWER_HEAT_ON_PIN, 
+				REMOTE_POWER_HEAT_OFF_PIN,
+				"HEAT");
+
 void 
 printStatus(Stream &s)
 {
+#ifdef __REED_SWITCHES__
   FD.printStatus(s);
   s.println();
   SD.printStatus(s);
@@ -59,7 +70,18 @@ printStatus(Stream &s)
   s.println();
   LW.printStatus(s);
   s.println();
+#endif
+
+#ifdef __MOTION_DETECTOR__
+  theMotionDetector.printStatus(s);
+  s.println();
+#endif
+
+#ifdef __REMOTE_POWER__
+  theRemoteHeat.printStatus(s);
+#endif
 }
+
 
 class USBSerial {
  public:
@@ -96,6 +118,7 @@ setup()
 
   Serial.println();
   Serial.println("CABIN SETUP: BEGIN");
+
 #ifdef __REED_SWITCHES__
   Serial.println("  REED SWITCHES:");
   FD.setup();
@@ -111,6 +134,19 @@ setup()
   LW.setup();
   Serial.println();
 #endif
+
+#ifdef __MOTION_DETECTOR__
+  Serial.println("  MOTION DETECTOR:");
+  theMotionDetector.setup();
+  Serial.println();
+#endif
+
+#ifdef __REMOTE_POWER__
+  Serial.println("  REMOTE POWER:");
+  theRemoteHeat.setup();
+  Serial.println();
+#endif
+
   Serial.println();
   Serial.println("CABIN SETUP: END");
 }
@@ -127,6 +163,14 @@ loop()
   BW.loopAction();
   KW.loopAction();
   LW.loopAction();
+#endif
+
+#ifdef __MOTION_DETECTOR__
+  theMotionDetector.loopAction();
+#endif
+
+#ifdef __REMOTE_POWER__
+  theRemoteHeat.loopAction();
 #endif
 
   theUSBSerial.loopAction();
@@ -156,66 +200,6 @@ public:
 } theAlarm;
 
 
-
-
-#define MOTION_DEFAULT_ALARM_THRESHOLD 5
-#define MOTION_TEST_ALARM_THRESHOLD 100
-class MotionDevice {
-private:
-  enum { PIRcalibrationTime=30 };           
-  boolean PIRMotion;
-  char _count;
-  char _pin;
-  char _alarmThreshold;
-public:  
-  MotionDevice(char pin) : _pin(pin) {
-      PIRMotion = false;
-      _count = 0;
-      _alarmThreshold = MOTION_DEFAULT_ALARM_THRESHOLD;
-  }
-  void alarmThreshold(char v) { _alarmThreshold = v; } 
-  boolean CheckAlarm();
-  char count() { return _count; }
-  void count(char v) { _count = v; }
-  void setup();
-  void loopAction();
-} Motion(PIR_PIN);
-
-void MotionDevice::loopAction()
-{  
-  if (digitalRead(_pin) ==  HIGH)  {
-      if (PIRMotion==false) {
-        _count++;
-        if (Globals.verbose) {
-          char tmp[8];
-          snprintf(tmp, 8, "%ld", _count);
-          Serial.print(" motion detected");
-          Serial.println(tmp);
-        }
-        PIRMotion=true;
-      }
-  } else {
-    if (PIRMotion==true) {
-      if (Globals.verbose) Serial.println("motion ended");
-      PIRMotion=false;
-    }
-  }
-}
-
-
-void MotionDevice::setup() {
-  pinMode(_pin, INPUT); 
-  digitalWrite(_pin, LOW);
-  //give the sensor some time to calibrate
-  Serial.print("calibrating PIR sensor ");
-  for(int i = 0; i < PIRcalibrationTime; i++){
-    Serial.print(".");
-    delay(1000);
-   }
-   Serial.println(" done");
-   Serial.println("PIR SENSOR ACTIVE");
-   delay(50);
-}
 
 #define TEMP_DEFAULT_INDOOR_LOW 10
 #define TEMP_DEFAULT_INDOOR_HIGH 45
@@ -410,14 +394,6 @@ GPRSDevice::loopAction()
 
 
 
-class RemoteDevice {
-  char _onPin, _offPin;
-public:
-  void On();
-  void Off();
-  void setup();
-  RemoteDevice(char onpin, char offpin) : _onPin(onpin), _offPin(offpin) {}
-} RemoteHeat(REMOTE_POWER_HEAT_ON_PIN, REMOTE_POWER_HEAT_OFF_PIN);
 
 void GPRSDevice::TogglePower()
 {
@@ -429,36 +405,6 @@ void GPRSDevice::TogglePower()
   delay(3000);
 }
 
-void RemoteDevice::setup()
-{
-    pinMode(_onPin, OUTPUT);
-    digitalWrite(_onPin,LOW);
-    pinMode(_offPin, OUTPUT);
-    digitalWrite(_offPin,LOW);
-    Off();  
-}
-
-void RemoteDevice::On()
-{
-  if (Globals.verbose) Serial.println("Remote Power: ON");
-//  digitalWrite(REMOTE_POWER_ON_PIN,LOW);
-//  delay(1000);
-  digitalWrite(_onPin,HIGH);
-  delay(1000);
-  digitalWrite(_onPin,LOW);
-//  delay(3000);
-}
- 
-void RemoteDevice::Off()
-{
-  if (Globals.verbose) Serial.println("Remote Power: OFF");
-//  digitalWrite(REMOTE_POWER_OFF_PIN,LOW);
-//  delay(1000);
-  digitalWrite(_offPin,HIGH);
-  delay(1000);
-  digitalWrite(_offPin,LOW);
-//  delay(3000);
-} 
 
 void TempDevice::PrintAlarms()
 {
@@ -517,13 +463,6 @@ boolean TempDevice::CheckAlarm()
   return true;
   }
   return false;
-}
-
-boolean MotionDevice::CheckAlarm()
-{
-  if (_count > _alarmThreshold) {
-    return true;
-  } else return false;
 }
 
 

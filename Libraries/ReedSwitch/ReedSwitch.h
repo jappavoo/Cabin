@@ -17,7 +17,7 @@ class ReedSwitch {
     _cur(CLOSED), _last(CLOSED), _cnt(0), 
     _pin(pin), _name(n) {}
 
-  void printStatus(Stream &s) {
+  inline void printStatus(Stream &s) {
     s.print(_name); 
     s.print(" ("); s.print(_pin, DEC); s.print(")"); 
     if (_cur == OPEN) Serial.print(": OPEN ");
@@ -26,7 +26,7 @@ class ReedSwitch {
     s.print(_cnt, DEC);
   }
   
-  void printShortStatus(Stream &s) {
+  inline void printShortStatus(Stream &s) {
     if (_cnt!=0) {
       s.print(_name);
       s.print(":");
@@ -34,7 +34,7 @@ class ReedSwitch {
     }
   }
 
-  void setup() {
+  inline void setup() {
     pinMode(_pin, INPUT);
     digitalWrite(_pin, HIGH);
     _cur = (enum State)digitalRead(_pin);
@@ -43,7 +43,7 @@ class ReedSwitch {
     printStatus(Serial);
   }
 
-  void loopAction() {
+  inline void loopAction() {
     _cur = (enum State)digitalRead(_pin);
     if (_cur != _last) {
       if (Globals.verbose) {
@@ -55,7 +55,7 @@ class ReedSwitch {
     }
   }
 
-  bool isAlarm() { 
+  inline bool isAlarm() { 
     if (_cnt != 0) return TRUE; else return FALSE; 
   }
    
