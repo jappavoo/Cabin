@@ -13,7 +13,7 @@ class RemotePower {
   _onPin(onpin), _offPin(offpin), _state(OFF), _name(n) {}
   
   inline void On() {
-    if (Globals.verbose) Serial.println("Remote Power: ON");
+    if (Globals.verbose()) Serial.println("Remote Power: ON");
     //  digitalWrite(REMOTE_POWER_ON_PIN,LOW);
     //  delay(1000);
     digitalWrite(_onPin,HIGH);
@@ -24,7 +24,7 @@ class RemotePower {
   }
 
   inline void Off() {
-    if (Globals.verbose) Serial.println("Remote Power: OFF");
+    if (Globals.verbose()) Serial.println("Remote Power: OFF");
     //  digitalWrite(REMOTE_POWER_OFF_PIN,LOW);
     //  delay(1000);
     digitalWrite(_offPin,HIGH);
@@ -35,7 +35,7 @@ class RemotePower {
   }
 
   inline void printStatus(Stream &s) {
-    s.print(" Remote Power(");
+    s.print("Remote Power(");
     s.print(_onPin, DEC); s.print(","); s.print(_offPin, DEC);
     s.print(") : ");
     s.print(_name);

@@ -11,9 +11,9 @@ unsigned char buffer[1024]; // buffer array for data recieve over serial port
 int count=0;     // counter for buffer array 
 void setup()
 {
-  GPRS.begin(9600);               // the GPRS baud rate   
+  //  GPRS.begin(9600);               // the GPRS baud rate   
 //  GPRS.println("AT+IPR=4800");
-//  GPRS.begin(4800);
+  GPRS.begin(4800);
   Serial.begin(19200);             // the Serial port of Arduino baud rate.
   Serial.println("GPRS SHIELD MONITOR: GPRS BAUD RATE: 9600");
 }

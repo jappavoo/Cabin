@@ -7,8 +7,16 @@ MONITOR_PORT = /dev/tty.usbmodemfd121
 
 USER_LIB_PATH := $(realpath ../Libraries)
 ARDUINO_LIBS = SoftwareSerial OneWire DallasTemperature \
-               ReedSwitch MotionDetector RemotePower
+               ReedSwitch MotionDetector RemotePower Temperature
+MONITOR_CMD = screen -S arduino
+
+.PHONY: reload
 
 
 include $(ARDMK_DIR)/arduino-mk/Arduino.mk
+
+reload:
+	-$(MONITOR_CMD) -X quit
+	$(MAKE) upload
+	$(MAKE) monitor
 

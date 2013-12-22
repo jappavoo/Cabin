@@ -8,35 +8,104 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-#define __REED_SWITCHES__
-#define __MOTION_DETECTOR__
-#define __REMOTE_POWER__
-
 enum PINS {  
-  REMOTE_POWER_HEAT_ON_PIN=2, 
-  REMOTE_POWER_HEAT_OFF_PIN=3,
-  MOTION_DETECTOR_PIN=4,
-  FRONT_DOOR_PIN=5,
-  SLIDING_DOOR_PIN=6,
-  ENTRY_WINDOW_PIN=11,
-  BATHROOM_WINDOW_PIN=12,
-  KITCHEN_WINDOW_PIN=A0,
-  LIVINGROOM_WINDOW_PIN=A1,
+  USB_SERIAL_RX=0,
+  USB_SERIAL_TX=1,
+
+  TEMP_BUS_PIN=2,               // 3 ext pins
+  MOTION_DETECTOR_PIN=3,
+  REMOTE_POWER_HEAT_OFF_PIN=4,
+  REMOTE_POWER_HEAT_ON_PIN=5, 
+
+  FRONT_DOOR_PIN=6,             // 2 ext pins 
+
   GPRS_SOFTSERIAL_PIN1=7,
   GPRS_SOFTSERIAL_PIN2=8,
   GPRS_POWER_PIN=9,
-  TEMP_INDOOR_PIN=10
+
+  SLIDING_DOOR_PIN=10,          // 2 ext pins 
+  ENTRY_WINDOW_PIN=11,          // 2 ext pins 
+  BATHROOM_WINDOW_PIN=12,       // 2 ext pins 
+  SPEAKER_PIN=13,
+  KITCHEN_WINDOW_PIN=A0,        // 2 ext pins 
+  LIVINGROOM_WINDOW_PIN=A1,     // 2 ext pins 
+
+  CABIN_VOLTAGE_PIN=A2,        // 2 wire external barrel connector
+  REMOTE_POWER_VOLTAGE_PIN=A3,        // 2 wire external barrel connector
+
+  FREE_PIN0=A4,
+  FREE_PIN1=A5
 };
 
-struct Globals {
-  boolean verbose;
-  unsigned long now;
-  boolean cmdMode;
-} Globals = { 
-  false,
-  0,
-  false
-};
+class Globals {
+  unsigned long _now;
+  
+  enum { FLGS_verbose_BIT=0, FLGS_cmdMode_BIT=1,   
+	 FLGS_indoorTemp_BIT=2, FLGS_outdoorTemp_BIT=3,
+	 FLGS_motion_BIT=4,
+	 FLGS_remoteHeat_BIT=5,
+	 FLGS_gprs_BIT=6,
+	 FLGS_FD_BIT=7, FLGS_SD_BIT=8, FLGS_EW_BIT=9, FLGS_BW_BIT=10, FLGS_KW_BIT=11,
+	 FLGS_LW_BIT=12,
+	 FLGS_speaker_BIT=13,
+	 FLGS_cabinVoltage_BIT=14,
+	 FLGS_remoteHeatVoltage_BIT=15 };
+	 
+  unsigned int flags;
+
+#define DEFINE_FLG_METHODS(FLG)					\
+  inline bool FLG () { return flags & (1 << FLGS_##FLG##_BIT); } \
+  inline void enable_##FLG () { flags |= (1 << FLGS_##FLG##_BIT); }	\
+  inline void disable_##FLG () { flags &= ~(1 << FLGS_##FLG##_BIT); }
+
+public:
+  inline void set_now(unsigned long t) { _now = t; }
+  inline unsigned long get_now() { return _now; }
+
+  DEFINE_FLG_METHODS(verbose);
+  DEFINE_FLG_METHODS(cmdMode);
+
+  DEFINE_FLG_METHODS(indoorTemp);
+  DEFINE_FLG_METHODS(outdoorTemp);
+
+  DEFINE_FLG_METHODS(motion);
+
+  DEFINE_FLG_METHODS(remoteHeat);
+
+  DEFINE_FLG_METHODS(gprs);
+
+  DEFINE_FLG_METHODS(FD);
+  DEFINE_FLG_METHODS(SD);
+  DEFINE_FLG_METHODS(EW);
+  DEFINE_FLG_METHODS(BW);
+  DEFINE_FLG_METHODS(KW);
+  DEFINE_FLG_METHODS(LW);
+
+  DEFINE_FLG_METHODS(speaker);
+  DEFINE_FLG_METHODS(cabinVoltage);
+  DEFINE_FLG_METHODS(remoteHeatVoltage);
+
+  void
+  setup() {
+    set_now(0);
+    // turn everything on by default
+    flags = 0xFFFF;
+    
+    // turn off these features
+    disable_verbose();
+    disable_cmdMode();
+    disable_motion();
+    disable_FD();
+    disable_SD();
+    disable_EW();
+    disable_BW();
+    disable_KW();
+    disable_LW();
+    disable_indoorTemp();
+    disable_outdoorTemp();
+  }
+} Globals;
+ 
 
 #include <ReedSwitch.h>
 class ReedSwitch FD(FRONT_DOOR_PIN, "FD" ), 
@@ -54,32 +123,44 @@ class RemotePower theRemoteHeat(REMOTE_POWER_HEAT_ON_PIN,
 				REMOTE_POWER_HEAT_OFF_PIN,
 				"HEAT");
 
+#include <Temperature.h>
+class TempBus theTempBus(TEMP_BUS_PIN);
+
 void 
 printStatus(Stream &s)
 {
-#ifdef __REED_SWITCHES__
-  FD.printStatus(s);
-  s.println();
-  SD.printStatus(s);
-  s.println();
-  EW.printStatus(s);
-  s.println();
-  BW.printStatus(s);
-  s.println();
-  KW.printStatus(s);
-  s.println();
-  LW.printStatus(s);
-  s.println();
-#endif
+  if (Globals.FD()) {
+    FD.printStatus(s);
+    s.println();
+  }
+  if (Globals.SD()) {
+    SD.printStatus(s);
+    s.println();
+  }
+  if (Globals.EW()) {
+    EW.printStatus(s);
+    s.println();
+  }
+  if (Globals.BW()) {
+    BW.printStatus(s);
+    s.println();
+  }
+  if (Globals.KW()) {
+    KW.printStatus(s);
+    s.println();
+  }
+  if (Globals.LW()) {
+    LW.printStatus(s);
+    s.println();
 
-#ifdef __MOTION_DETECTOR__
-  theMotionDetector.printStatus(s);
-  s.println();
-#endif
-
-#ifdef __REMOTE_POWER__
-  theRemoteHeat.printStatus(s);
-#endif
+  }
+  if (Globals.motion()) {
+    theMotionDetector.printStatus(s);
+    s.println();
+  }
+  if (Globals.remoteHeat()) {
+    theRemoteHeat.printStatus(s);
+  }
 }
 
 
@@ -91,17 +172,31 @@ class USBSerial {
   void loopAction() {
     if (Serial.available())  {          
       char serialInByte  = Serial.read();
-      if (serialInByte=='~') Globals.cmdMode=!Globals.cmdMode;
-      if (Globals.cmdMode) {
+      if (serialInByte=='~') {
+	if (Globals.cmdMode()) Globals.disable_cmdMode();
+	else Globals.enable_cmdMode();
+      }
+      if (Globals.cmdMode()) {
 	switch(serialInByte) {
 	case 's':
 	  printStatus(Serial);
+	  Serial.println();
+	  break;
+	case 'p':
+	  theRemoteHeat.On();
+	  printStatus(Serial);
+	  Serial.println();
+	  break;
+	case 'P':
+	  theRemoteHeat.Off();
+	  printStatus(Serial);
+	  Serial.println();
 	  break;
 	case 'v':
-	  Globals.verbose=false;
+	  Globals.enable_verbose();
 	  break;
 	case 'V':
-	  Globals.verbose=true;
+	  Globals.disable_verbose();
 	  break;  
 	default:
 	  Serial.write(serialInByte);
@@ -114,38 +209,58 @@ class USBSerial {
 void
 setup()
 {
+  Globals.setup();
+
   theUSBSerial.setup();
 
   Serial.println();
   Serial.println("CABIN SETUP: BEGIN");
 
-#ifdef __REED_SWITCHES__
-  Serial.println("  REED SWITCHES:");
-  FD.setup();
-  Serial.println();
-  SD.setup();
-  Serial.println();
-  EW.setup();
-  Serial.println();
-  BW.setup();
-  Serial.println();
-  KW.setup();
-  Serial.println();
-  LW.setup();
-  Serial.println();
-#endif
+  if (Globals.remoteHeat()) {
+    Serial.println("  REMOTE POWER:");
+    theRemoteHeat.setup();
+    Serial.println();
+  }
 
-#ifdef __MOTION_DETECTOR__
-  Serial.println("  MOTION DETECTOR:");
-  theMotionDetector.setup();
-  Serial.println();
-#endif
+  if (Globals.FD() || Globals.SD() || Globals.EW() || Globals.BW() ||
+      Globals.KW() || Globals.LW()) {
+    Serial.println("  REED SWITCHES:");
+    if (Globals.FD()) {
+      FD.setup();
+      Serial.println();
+    }
+    if (Globals.SD()) {
+      SD.setup();
+      Serial.println();
+    }
+    if (Globals.EW()) {
+      EW.setup();
+      Serial.println();
+    }
+    if (Globals.BW()) {
+      BW.setup();
+      Serial.println();
+    }
+    if (Globals.KW()) {
+      KW.setup();
+      Serial.println();
+    }
+    if (Globals.LW()) {
+      LW.setup();
+      Serial.println();
+    }
+  }
 
-#ifdef __REMOTE_POWER__
-  Serial.println("  REMOTE POWER:");
-  theRemoteHeat.setup();
-  Serial.println();
-#endif
+  if (Globals.indoorTemp() || Globals.outdoorTemp()) {
+    Serial.println("  TEMP BUS:");
+    theTempBus.setup();
+  }
+
+  if (Globals.motion()) {
+    Serial.println("  MOTION DETECTOR:");
+    theMotionDetector.setup();
+    Serial.println();
+  }
 
   Serial.println();
   Serial.println("CABIN SETUP: END");
@@ -154,24 +269,18 @@ setup()
 void
 loop()
 {
-  Globals.now = millis();
+  Globals.set_now(millis());
 
-#ifdef __REED_SWITCHES__  
-  FD.loopAction();
-  SD.loopAction();
-  EW.loopAction();
-  BW.loopAction();
-  KW.loopAction();
-  LW.loopAction();
-#endif
+  if (Globals.FD()) FD.loopAction();
+  if (Globals.SD()) SD.loopAction();
+  if (Globals.EW()) EW.loopAction();
+  if (Globals.BW()) BW.loopAction();
+  if (Globals.KW()) KW.loopAction();
+  if (Globals.LW()) LW.loopAction();
 
-#ifdef __MOTION_DETECTOR__
-  theMotionDetector.loopAction();
-#endif
+  if (Globals.motion()) theMotionDetector.loopAction();
 
-#ifdef __REMOTE_POWER__
-  theRemoteHeat.loopAction();
-#endif
+  if (Globals.remoteHeat()) theRemoteHeat.loopAction();
 
   theUSBSerial.loopAction();
 }

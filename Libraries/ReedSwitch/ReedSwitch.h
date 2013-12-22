@@ -46,7 +46,7 @@ class ReedSwitch {
   inline void loopAction() {
     _cur = (enum State)digitalRead(_pin);
     if (_cur != _last) {
-      if (Globals.verbose) {
+      if (Globals.verbose()) {
          printStatus(Serial);
          Serial.println();
       }

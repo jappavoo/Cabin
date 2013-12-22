@@ -48,7 +48,7 @@ public:
     if (digitalRead(_pin) ==  HIGH)  {
       if (PIRMotion==false) {
         _count++;
-        if (Globals.verbose) {
+        if (Globals.verbose()) {
           Serial.print("  PIR START:");
 	  printStatus(Serial);
 	  Serial.println();
@@ -57,7 +57,7 @@ public:
       }
     } else {
       if (PIRMotion==true) {
-	if (Globals.verbose) {
+	if (Globals.verbose()) {
 	  Serial.println("  PIR ENDED.");
 	  printStatus(Serial);
 	  Serial.println();
