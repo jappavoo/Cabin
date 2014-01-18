@@ -453,6 +453,7 @@ float DallasTemperature::calculateTemperature(uint8_t* deviceAddress, uint8_t* s
       return (float)(rawTemperature >> 1) - 0.25 +((float)(scratchPad[COUNT_PER_C] - scratchPad[COUNT_REMAIN]) / (float)scratchPad[COUNT_PER_C] );
       break;
   }
+  return 0.0;
 }
 
 // returns temperature in degrees C or DEVICE_DISCONNECTED if the
@@ -649,12 +650,13 @@ bool DallasTemperature::alarmSearch(uint8_t* newAddr)
 // TODO: can this be done with only TEMP_MSB REGISTER (faster)
 //       if ((char) scratchPad[TEMP_MSB] <= (char) scratchPad[LOW_ALARM_TEMP]) return true;
 //       if ((char) scratchPad[TEMP_MSB] >= (char) scratchPad[HIGH_ALARM_TEMP]) return true;
-bool DallasTemperature::hasAlarm(uint8_t* deviceAddress)
+bool DallasTemperature::hasAlarm(uint8_t* deviceAddress, float &temp)
 {
   ScratchPad scratchPad;
+  temp = 0.0;
   if (isConnected(deviceAddress, scratchPad))
   {
-    float temp = calculateTemperature(deviceAddress, scratchPad);
+    temp = calculateTemperature(deviceAddress, scratchPad);
 
     // check low alarm
     if ((char)temp <= (char)scratchPad[LOW_ALARM_TEMP]) return true;
@@ -662,7 +664,6 @@ bool DallasTemperature::hasAlarm(uint8_t* deviceAddress)
     // check high alarm
     if ((char)temp >= (char)scratchPad[HIGH_ALARM_TEMP]) return true;
   }
-
   // no alarm
   return false;
 }

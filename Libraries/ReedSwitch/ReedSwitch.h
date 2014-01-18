@@ -26,12 +26,14 @@ class ReedSwitch {
     s.print(_cnt, DEC);
   }
   
-  inline void printShortStatus(Stream &s) {
+  inline boolean printShortStatus(Stream &s) {
     if (_cnt!=0) {
       s.print(_name);
       s.print(":");
       s.print(_cnt, DEC);
+      return TRUE;
     }
+    return FALSE;
   }
 
   inline void setup() {
@@ -58,6 +60,8 @@ class ReedSwitch {
   inline bool isAlarm() { 
     if (_cnt != 0) return TRUE; else return FALSE; 
   }
+
+  inline void resetAlarm() { _cnt=0; }
    
 };
 

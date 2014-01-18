@@ -167,7 +167,7 @@ class DallasTemperature
   bool alarmSearch(uint8_t*);
 
   // returns true if ia specific device has an alarm
-  bool hasAlarm(uint8_t*);
+  bool hasAlarm(uint8_t*, float &temp);
 
   // returns true if any device is reporting an alarm on the bus
   bool hasAlarm(void);

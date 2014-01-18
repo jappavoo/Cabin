@@ -5,10 +5,11 @@
 
 class TempBus : public DallasTemperature {
   OneWire _oneWire;
+  unsigned long _last;
   char _numDev; 
 public:
   TempBus(char pin) : DallasTemperature(&_oneWire), 
-		      _oneWire(pin), _numDev(0) {}
+		      _oneWire(pin), _last(0), _numDev(0) {}
 
   void printTemperature(DeviceAddress deviceAddress, Stream &s) {
     float tempC = getTempC(deviceAddress);
@@ -22,11 +23,11 @@ public:
   {
     char temp;
     temp = getHighAlarmTemp(deviceAddress);
-    s.print("High Alarm: ");
+    s.print("High Alarm:");
     s.print(temp, DEC);
     s.print("C/");
     s.print(toFahrenheit(temp));
-    s.print("F | Low Alarm: ");
+    s.print("F Low Alarm:");
     temp = getLowAlarmTemp(deviceAddress);
     s.print(temp, DEC);
     s.print("C/");
@@ -46,7 +47,7 @@ public:
 
   // function to print a device's resolution
   void printResolution(DeviceAddress deviceAddress, Stream &s) {
-    s.print("Resolution: ");
+    s.print("Resolution:");
     s.print(getResolution(deviceAddress), DEC);
   }
 
@@ -84,59 +85,115 @@ public:
     _numDev = getDeviceCount();
     Serial.print(" Found ");
     Serial.print(_numDev, DEC);
-    Serial.print(" devices. Requesting Temperatures ...");
-    requestTemperatures();
-    Serial.println("Probing Thermometers:");
-    for (char i=0; i<_numDev; i++)  {
-      Serial.print(i, DEC);
-      Serial.print(": ");
-      if (getAddress(addr, i)) {
-        printDetails(addr, Serial);
-      } else {
-	Serial.println(" Error getting address!");
+    Serial.print(" devices. ");
+    if (_numDev) {
+      Serial.println("Requesting Temperatures ...");
+      requestTemperatures();
+      Serial.println("Probing Thermometers:");
+      for (char i=0; i<_numDev; i++)  {
+	Serial.print(i, DEC);
+	Serial.print(": ");
+	if (getAddress(addr, i)) {
+	  printDetails(addr, Serial);
+	} else {
+	  Serial.println(" Error getting address!");
+	}
       }
+      // set non-blocking mode 
+      setWaitForConversion(FALSE);
+      // initialize first request for temperatures
+      requestTemperatures();
+      _last = millis();
+    } else {
+      Serial.println();
     }
   }
 
-  void loopAction() {
-#if 0
-    if ((Globals.now - _last) > TEMP_CHECK_DELAY_MS) {
-      for (i=0; i<_numTherms; i++) {
-	_thermometers[i].getTempC();
-      }
+  boolean loopAction() {
+    if ((millis() - _last) > TEMP_CHECK_DELAY_MS) {
+      requestTemperatures();
+      _last = millis();
+      return TRUE;
     }
-#endif
+    return FALSE;
   }
 
 };
 
-#if 0
 class DS18B20 {
   DeviceAddress _addr;
+  const char *_name;
+  float _temp;
+  boolean _alarm;
 public:
-  DS18B20(uint8_t addr);
-
-  void printStatus(Stream &s) {
+  DS18B20(uint8_t *addr, const char *name) : 
+    _name(name), _temp(0.0), _alarm(FALSE) {
+    _addr[0] = addr[0]; _addr[1]=addr[1]; _addr[2]=addr[2]; _addr[3]=addr[3];
+    _addr[4] = addr[4]; _addr[5]=addr[5]; _addr[6]=addr[6]; _addr[7]=addr[7];
+  }
+    
+  void printTemperature(Stream &s, TempBus bus) {
+    Serial.print(_temp);
+    Serial.print("C/");
+    Serial.print(bus.toFahrenheit(_temp));
+    Serial.print("F");
   }
 
-  void printShortStatus(Stream &s) {
+  void printStatus(Stream &s, TempBus &bus) {
+    s.print(_name);
+    s.print(": ");
+    bus.printAddress(_addr, s);
+    s.print(",");
+    bus.printResolution(_addr,s);
+    s.print(",");
+    bus.printPowerSuppy(_addr, s);
+    s.print(",");
+    bus.printAlarms(_addr, s);
+    s.print(",");
+    printTemperature(s, bus);
+  }
+
+  boolean printShortStatus(Stream &s, TempBus &bus) {
+    s.print(_name);
+    if (_alarm == TRUE) s.print(":*ALARM*");
+    else s.print(":");
+    printTemperature(s,bus);
+    return TRUE;
   }
 
   bool addrMatch(uint8_t *addr) {
-    return _addr[0] == addr[0] && _addr[1] == addr[1] && _addr[2] == addr[2] && 
-      _addr[3] == addr[3] &&
+    return (_addr[0] == addr[0] && _addr[1] == addr[1] && 
+	    _addr[2] == addr[2] && _addr[3] == addr[3] &&
+	    _addr[4] == addr[4] && _addr[5] == addr[5] && 
+	    _addr[6] == addr[6] && _addr[7] == addr[7]);
   }
 
-  void setup() {
+  void setAlarmTemps(TempBus &bus, char low, char high) {
+    bus.setHighAlarmTemp(_addr, high);
+    bus.setLowAlarmTemp(_addr, low);
   }
 
-  void loopAction() {
+  boolean setup(TempBus &bus, char low, char high) {
+    if (bus.isConnected(_addr)) {
+      setAlarmTemps(bus, low, high);
+      printStatus(Serial, bus);
+      Serial.println();
+      return TRUE;
+    }
+    return FALSE;
   }
 
-  bool isAlarm() {
+  void loopAction(TempBus &bus) {
+    _alarm = bus.hasAlarm(_addr, _temp);
+    if (Globals.verbose()) {
+      printShortStatus(Serial,bus);
+      Serial.println();
+    }
   }
+
+  bool isAlarm() { return _alarm; }
+  void resetAlarm() { _alarm = FALSE; }
 
 };
-#endif
 
 #endif
