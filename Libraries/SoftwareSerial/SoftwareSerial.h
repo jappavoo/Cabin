@@ -46,8 +46,10 @@ http://arduiniana.org.
 
 class SoftwareSerial : public Stream
 {
-private:
+protected:
   // per object data
+  const uint32_t RESPONSE_TERMINATOR;
+  uint32_t _last4;
   uint8_t _receivePin;
   uint8_t _receiveBitMask;
   volatile uint8_t *_receivePortRegister;
@@ -82,6 +84,7 @@ public:
   // public methods
   SoftwareSerial(uint8_t receivePin, uint8_t transmitPin, bool inverse_logic = false);
   ~SoftwareSerial();
+  bool hasResponse() { return (_last4 == RESPONSE_TERMINATOR); };
   void begin(long speed);
   bool listen();
   void end();

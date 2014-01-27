@@ -36,9 +36,9 @@ public:
     pinMode(_pin, INPUT); 
     digitalWrite(_pin, LOW);
     //give the sensor some time to calibrate
-    Serial.print("calibrating PIR sensor ");
+    //    Serial.print("calibrating PIR sensor ");
     for(int i = 0; i < PIRcalibrationTime; i++){
-      Serial.print(".");
+      //      Serial.print(".");
       Globals.yellowLed.On();
       //      digitalWrite(YELLOW_LED_PIN, HIGH);
       delay(500);
@@ -46,7 +46,7 @@ public:
       //      digitalWrite(YELLOW_LED_PIN, LOW);
       delay(500);
     }
-    Serial.println(" done");
+    //    Serial.println(" done");
     Serial.println("PIR SENSOR ACTIVE");
     printStatus(Serial);
   }
@@ -57,7 +57,7 @@ public:
 	Globals.yellowLed.On();
         _count++;
         if (Globals.verbose()) {
-          Serial.print("  PIR START:");
+	  //          Serial.print("  PIR START:");
 	  printStatus(Serial);
 	  Serial.println();
         }
@@ -67,7 +67,7 @@ public:
       if (PIRMotion==true) {
 	Globals.yellowLed.Off();
 	if (Globals.verbose()) {
-	  Serial.println("  PIR ENDED.");
+	  //	  Serial.println("  PIR ENDED.");
 	  printStatus(Serial);
 	  Serial.println();
 	}

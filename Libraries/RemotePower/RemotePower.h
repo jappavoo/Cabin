@@ -15,24 +15,32 @@ class RemotePower {
   _onPin(onpin), _offPin(offpin), _state(OFF), _sensor(NULL), _name(n) {} 
   
   inline void On() {
-    if (Globals.verbose()) Serial.println("Remote Power: ON");
+    //    if (Globals.verbose()) Serial.println("Remote Power: ON");
     //  digitalWrite(REMOTE_POWER_ON_PIN,LOW);
     //  delay(1000);
     digitalWrite(_onPin,HIGH);
     delay(1000);
     digitalWrite(_onPin,LOW);
     _state = ON;
+    if (hasSensor()) {
+      delay(2000);
+      _sensor->loopAction();
+    }
     //  delay(3000);
   }
 
   inline void Off() {
-    if (Globals.verbose()) Serial.println("Remote Power: OFF");
+    // if (Globals.verbose()) Serial.println("Remote Power: OFF");
     //  digitalWrite(REMOTE_POWER_OFF_PIN,LOW);
     //  delay(1000);
     digitalWrite(_offPin,HIGH);
     delay(1000);
     digitalWrite(_offPin,LOW);
     _state = OFF;
+    if (hasSensor()) {
+      delay(2000);
+      _sensor->loopAction();
+    }
     //  delay(3000);
   }
 

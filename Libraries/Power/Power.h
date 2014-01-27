@@ -13,15 +13,15 @@ class Power {
   inline enum STATE state() { return _state; }
   inline boolean printShortStatus(Stream &s) {
     s.print(_name);
-    s.print(" (");
-    s.print(_pin, DEC);
-    s.print("):");
-    if (_state==ON) s.print("ON");
-    else s.print("OFF");
+    if (_state==ON) s.print(": ON");
+    else s.print(": OFF");
     return TRUE;
   }
   inline void printStatus(Stream &s) {
     printShortStatus(s);
+    s.print(" (");
+    s.print(_pin, DEC);
+    s.print("):");
     s.print(" (");
     s.print(_state, DEC);
     s.print(")");

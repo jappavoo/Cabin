@@ -13,10 +13,10 @@ public:
 
   void printTemperature(DeviceAddress deviceAddress, Stream &s) {
     float tempC = getTempC(deviceAddress);
-    Serial.print(tempC);
-    Serial.print("C/");
-    Serial.print(toFahrenheit(tempC));
-    Serial.print("F");
+    s.print(tempC);
+    s.print("C/");
+    s.print(toFahrenheit(tempC));
+    s.print("F");
   }
 
   void printAlarms(DeviceAddress deviceAddress, Stream &s)
@@ -78,21 +78,21 @@ public:
     DeviceAddress addr;
 
     begin();
-    Serial.print("TempBus: Global Power Mode: ");
+    //    Serial.print("TempBus: Global Power Mode: ");
     printGlobalPowerMode(Serial);
     Serial.println();
-    Serial.println("TempBus: Searching for Devices:");
+    //    Serial.println("TempBus: Searching for Devices:");
     _numDev = getDeviceCount();
-    Serial.print(" Found ");
-    Serial.print(_numDev, DEC);
-    Serial.print(" devices. ");
+    //    Serial.print(" Found ");
+    //    Serial.print(_numDev, DEC);
+    //    Serial.print(" devices. ");
     if (_numDev) {
-      Serial.println("Requesting Temperatures ...");
+      //      Serial.println("Requesting Temperatures ...");
       requestTemperatures();
-      Serial.println("Probing Thermometers:");
+      //      Serial.println("Probing Thermometers:");
       for (char i=0; i<_numDev; i++)  {
-	Serial.print(i, DEC);
-	Serial.print(": ");
+	//	Serial.print(i, DEC);
+	//	Serial.print(": ");
 	if (getAddress(addr, i)) {
 	  printDetails(addr, Serial);
 	} else {
@@ -133,10 +133,10 @@ public:
   }
     
   void printTemperature(Stream &s, TempBus bus) {
-    Serial.print(_temp);
-    Serial.print("C/");
-    Serial.print(bus.toFahrenheit(_temp));
-    Serial.print("F");
+    s.print(_temp);
+    s.print("C/");
+    s.print(bus.toFahrenheit(_temp));
+    s.print("F");
   }
 
   void printStatus(Stream &s, TempBus &bus) {

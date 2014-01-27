@@ -248,6 +248,7 @@ void SoftwareSerial::recv()
     {
       // save new data in buffer: tail points to where byte goes
       _receive_buffer[_receive_buffer_tail] = d; // save new byte
+      if (_last4 != RESPONSE_TERMINATOR) _last4 = (_last4 << 8) | d;
       _receive_buffer_tail = (_receive_buffer_tail + 1) % _SS_MAX_RX_BUFF;
     } 
     else 
@@ -333,6 +334,8 @@ ISR(PCINT3_vect)
 // Constructor
 //
 SoftwareSerial::SoftwareSerial(uint8_t receivePin, uint8_t transmitPin, bool inverse_logic /* = false */) : 
+  RESPONSE_TERMINATOR(((uint32_t)'O' << 24) | ((uint32_t)'K' << 16) | ((uint32_t)'\r' << 8) | ((uint32_t)'\n' << 0) ),
+  _last4(0x00000000),
   _rx_delay_centering(0),
   _rx_delay_intrabit(0),
   _rx_delay_stopbit(0),
@@ -501,6 +504,7 @@ void SoftwareSerial::flush()
   uint8_t oldSREG = SREG;
   cli();
   _receive_buffer_head = _receive_buffer_tail = 0;
+  _last4 = 0x00000000;
   SREG = oldSREG;
 }
 

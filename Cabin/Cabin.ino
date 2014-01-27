@@ -57,15 +57,17 @@ class Globals {
   inline void disable_##FLG () { flags &= ~((uint32_t)1 << FLGS_##FLG##_BIT); }
 
 public:
+  boolean hasSerialByte;
+  uint8_t serialInByte;
   Led redLed;
   Led yellowLed;
-
   Globals() : flags(0), statusCnt(0),
 	      redLed(RED_LED_PIN, "Red"), yellowLed(YELLOW_LED_PIN, "Yellow") 
   {}
   //  inline void set_now(unsigned long t) { _now = t; }
   //  inline unsigned long get_now() { return _now; }
 
+ 
   DEFINE_FLG_METHODS(verbose);
   DEFINE_FLG_METHODS(cmdMode);
 
@@ -94,8 +96,11 @@ public:
   void printStatus(Stream &s);
   void printShortStatus(Stream &s);
 
-  void
-  setup() {
+  void ExitCmdMode(); 
+
+  void EnterCmdMode();
+
+  void setup() {
     redLed.setup();
     Serial.print(" ");
     yellowLed.setup();
@@ -118,7 +123,7 @@ public:
     // disable_outdoorTemp();
     // disable_cabinPower();
     // disable_remotePower();
-    disable_gprsModem();
+    // disable_gprsModem();
     // disable_Alarm();
   }
 } Globals;
@@ -132,7 +137,7 @@ class ReedSwitch FD(FRONT_DOOR_PIN, "FD" ),
   LW(LIVINGROOM_WINDOW_PIN, "LW");
 
 #include <Power.h>
-class Power cabinPower(CABIN_POWER_PIN, "Cabin Power");
+class Power cabinPower(CABIN_POWER_PIN, "Power");
 class Power remotePower(REMOTE_POWER_PIN, "Remote Power");
 
 #include <MotionDetector.h>
@@ -163,11 +168,43 @@ const char  * GPRSAuthorizedNumbers[]= {
   "\"+19175762236\"",
   "\"+19175093685\"",
   0
-};
+}; 
 const long GPRS_SOFSERIAL_BAUD=4800;
 
 GPRSModem gprsModem(GPRS_SOFTSERIAL_PIN1, GPRS_SOFTSERIAL_PIN2, GPRS_POWER_PIN);
 
+
+void 
+Globals::ExitCmdMode()  
+{
+  Serial.println("Exiting Command Mode");
+  disable_cmdMode();
+  if (gprsModem()) {
+    ::gprsModem.flush();
+    ::gprsModem.EchoOn();
+    ::gprsModem.waitForResponse();
+  }
+  hasSerialByte=FALSE;
+}
+
+void 
+Globals::EnterCmdMode() {
+  Serial.println("Entering Command Mode");
+  enable_cmdMode();
+  if (gprsModem()) {
+    ::gprsModem.flush();
+    ::gprsModem.EchoOff();
+    ::gprsModem.waitForResponse();
+    
+    ::gprsModem.flush();
+    ::gprsModem.turnOffMsgIndications();
+    ::gprsModem.waitForResponse();
+
+    ::gprsModem.flush();
+    ::gprsModem.TextModeSMS();
+    ::gprsModem.waitForResponse();
+  }
+}
 
 #define ALARM_DEFAULT_RESEND_MINUTES 5
 class Alarm {
@@ -187,7 +224,7 @@ public:
   void Disarm() { 
     _armed = false; msgs = 0; 
     Globals.redLed.Off();
-    Serial.println("Alarm: Disarmed"); 
+    //    Serial.println("Alarm: Disarmed"); 
   }
   void Clear() {
       // reset all device Alarms
@@ -205,7 +242,7 @@ public:
       msgs = 0;
       Clear();
       Globals.redLed.flash(Led::SLOW);
-      Serial.println("Alarm: Armed");
+      // Serial.println("Alarm: Armed");
     }
   }
 
@@ -261,16 +298,20 @@ public:
 	    for (int i=gprsModem.firstAuthorizedIndex(); 
 		 gprsModem.validAuthorizedIndex(i); 
 		 i=gprsModem.nextAuthorizedIndex(i)) {
+#if 0
 	      Serial.print("Sending Alarm SMS to ");
 	      Serial.println(gprsModem.AuthorizedNumber(i));
+#endif
+ 	      gprsModem.flush();
 	      gprsModem.openSMS(i);
-	      printShortStatus(gprsModem);
+	      Globals.printShortStatus(gprsModem);
 	      gprsModem.closeSMS();
+	      gprsModem.waitForResponse();
 	    }
 	  }	 
 	  msgs++;
 	  if (msgs==msgMax) { 
-	    Serial.print("Alarm.msgs sent turning off");
+	    //	    Serial.print("Alarm.msgs sent turning off");
 	    Disarm();
 	  } else {
 	    lastSend=millis();
@@ -287,14 +328,19 @@ class USBSerial {
     Serial.begin(19200);
   }
   void loopAction() {
+    Globals.hasSerialByte = FALSE;
     if (Serial.available())  {          
-      char serialInByte  = Serial.read();
-      if (serialInByte=='~') {
-	if (Globals.cmdMode()) Globals.disable_cmdMode();
-	else Globals.enable_cmdMode();
+      Globals.serialInByte  = Serial.read();
+      Globals.hasSerialByte = TRUE;
+      if (Globals.serialInByte=='~') {
+	if (Globals.cmdMode()) {
+	  Globals.ExitCmdMode();
+	} else {
+	  Globals.EnterCmdMode();
+	}  
       }
       if (Globals.cmdMode()) {
-	switch(serialInByte) {
+	switch(Globals.serialInByte) {
 	case 's':
 	  Globals.printShortStatus(Serial);
 	  break;
@@ -303,11 +349,11 @@ class USBSerial {
 	  break;
 	case 'p':
 	  theRemoteHeat.On();
-	  Globals.printStatus(Serial);
+	  // Globals.printStatus(Serial);
 	  break;
 	case 'P':
 	  theRemoteHeat.Off();
-	  Globals.printStatus(Serial);
+	  // Globals.printStatus(Serial);
 	  break;
 	case 'v':
 	  Globals.enable_verbose();
@@ -318,6 +364,13 @@ class USBSerial {
 	case 'a':
 	  if (Globals.Alarm()) theAlarm.Arm();
 	  break;
+	case 'A':
+	  if (Globals.Alarm()) theAlarm.Disarm();
+	  break;
+	case 'C':
+	  if (Globals.Alarm()) theAlarm.Clear();
+	  break;
+#if 0
 	case 'c':
 	  Globals.redLed.flash(Led::SLOW);
 	  Globals.yellowLed.flash(Led::SLOW);
@@ -338,11 +391,52 @@ class USBSerial {
 	  Globals.redLed.Off();
 	  Globals.yellowLed.Off();
 	  break;
-	case 'A':
-	  if (Globals.Alarm()) theAlarm.Disarm();
+#endif
+	case 'm':
+	  Globals.enable_motion();
+	  break;
+	case 'M':
+	  Globals.disable_motion();
+	  break;
+	case 'o':
+	  if (Globals.gprsModem()) {
+	    if (gprsModem.isOn()) Serial.println("gprsModem: ON");
+	    else Serial.println("gprsModem: OFF");
+	  }
+	  break;
+	case 'g':
+	  if (Globals.gprsModem()) gprsModem.TogglePower();
+	  break;
+	case 'w':
+	  Globals.printShortStatus(Serial);
+	  if (Globals.gprsModem()) {
+	    gprsModem.flush();
+	    gprsModem.openSMS(0);
+	    Globals.printShortStatus(gprsModem);
+	    gprsModem.closeSMS();
+	    gprsModem.waitForResponse();
+	  }
+	  break;
+	case 'f':
+	  if (Globals.gprsModem()) gprsModem.flush();
+	  break;
+	case 'd':
+	  if (Globals.gprsModem()) { 
+	    Serial.println(gprsModem.last4(), HEX);
+	    Serial.println(gprsModem.responseTerminator(), HEX);
+	    gprsModem.dumpBuffer();
+	  }
+	  break;
+	case 'r':
+	  if (Globals.gprsModem()) { 
+	    gprsModem.ReadSmsStore((uint8_t)2);
+	    Serial.println(gprsModem.waitForResponse(), DEC);
+	  }
+	case 'z':
+	  if (Globals.gprsModem()) gprsModem.ListSMS();
 	  break;
 	default:
-	  Serial.write(serialInByte);
+	  Serial.write(Globals.serialInByte);
 	}
       }  
     }
@@ -367,7 +461,7 @@ Globals::printShortStatus(Stream &s)
   if (motion() && theMotionDetector.printShortStatus(s)) s.print(" ");
   if (remoteHeat() && theRemoteHeat.printShortStatus(s)) s.print(" ");
   if (cabinPower() && ::cabinPower.printShortStatus(s)) s.print(" ");
-  if (remotePower() && ::remotePower.printShortStatus(s)) s.print(" ");
+  //  if (remotePower() && ::remotePower.printShortStatus(s)) s.print(" ");
   if (gprsModem() && ::gprsModem.printShortStatus(s)) s.print(" ");
   s.println();
 }
@@ -397,6 +491,49 @@ Globals::printStatus(Stream &s)
 }
 
 
+void processCmd(int anidx, char *buffer) 
+{
+  boolean sndStatus=false;
+
+  Serial.print("processCmd:");
+  for (int j=0; buffer[j]!='\n'; j++) { if (buffer[j]!='\r') Serial.print(buffer[j]); }
+  Serial.println();
+  if (strncmp(buffer, "Disarm", 6) == 0) {
+    theAlarm.Disarm();
+    sndStatus = true;
+  } else if (strncmp(buffer, "Status", 6) == 0) {
+    sndStatus=true;
+  } else if (strncmp(buffer, "Arm", 3) == 0) {
+    theAlarm.Arm();
+    sndStatus = true;
+  } else if (strncmp(buffer, "Clear", 5) == 0) {
+    theAlarm.Clear();
+    sndStatus = true;
+  } else if (strncmp(buffer, "Heat on", 7)==0) {
+    theRemoteHeat.On();
+    sndStatus=true;
+  } else if (strncmp(buffer, "Heat off", 8)==0) {
+    theRemoteHeat.Off();
+    sndStatus=true;
+  } else if (strncmp(buffer, "Motion off", 10) == 0) {
+    Globals.disable_motion();
+  } else if (strncmp(buffer, "Motion on", 9) == 0) {
+    Globals.enable_motion();
+  } 
+  if (sndStatus == true) {    
+    Serial.print(anidx, DEC);
+    Serial.print(": ");
+    Serial.print(gprsModem.AuthorizedNumber(anidx));
+    Serial.print(": ");
+    Globals.printShortStatus(Serial);
+
+    gprsModem.flush();
+    gprsModem.openSMS(anidx);
+    Globals.printShortStatus(gprsModem);
+    gprsModem.closeSMS();
+    gprsModem.waitForResponse();
+  }
+}
 
 
 void
@@ -409,14 +546,14 @@ setup()
   Serial.println("CABIN SETUP: BEGIN");
 
   if (Globals.remoteHeat()) {
-    Serial.println("  REMOTE POWER:");
+    //    Serial.println("  REMOTE POWER:");
     theRemoteHeat.setup();
     Serial.println();
   }
 
   if (Globals.FD() || Globals.SD() || Globals.EW() || Globals.BW() ||
       Globals.KW() || Globals.LW()) {
-    Serial.println("  REED SWITCHES:");
+    //    Serial.println("  REED SWITCHES:");
     if (Globals.FD()) {
       FD.setup();
       Serial.println();
@@ -444,7 +581,7 @@ setup()
   }
 
   if (Globals.indoorTemp() || Globals.outdoorTemp()) {
-    Serial.println("  TEMP BUS:");
+    //    Serial.println("  TEMP BUS:");
     theTempBus.setup();
     if (Globals.indoorTemp() && 
 	!indoorThermometer.setup(theTempBus, 
@@ -461,7 +598,7 @@ setup()
   }
 
   if (Globals.cabinPower() || Globals.remotePower()) {
-    Serial.println(" POWER DETECTORS:");
+    //    Serial.println(" POWER DETECTORS:");
     if (Globals.cabinPower()) {
       cabinPower.setup();
       Serial.println();
@@ -477,19 +614,22 @@ setup()
   }
 
   if (Globals.motion()) {
-    Serial.println("  MOTION DETECTOR:");
+    Serial.println("  Wait MOTION DETECTOR Initializing:");
     theMotionDetector.setup();
     Serial.println();
   }
 
   if (Globals.gprsModem()) {
-    Serial.println("  GPRS MODEM");
-    gprsModem.setup(4800, (char **)GPRSAuthorizedNumbers);
+    //    Serial.println("  GPRS MODEM");
+    gprsModem.setup(4800, (char **)GPRSAuthorizedNumbers, processCmd);
+    while (!gprsModem.isOn()) {
+      gprsModem.TogglePower();
+    }
     Serial.println();
   }
 
   if (Globals.Alarm()) {
-    Serial.println("  ALARM");
+    //    Serial.println("  ALARM");
     theAlarm.setup();
     Serial.println(); 
   }
@@ -497,6 +637,14 @@ setup()
   //  Globals.redLed.On();
   //  Globals.yellowLed.On();
   Serial.println("CABIN SETUP: END");
+
+  if (Globals.cmdMode()) {
+    Globals.EnterCmdMode();
+    Serial.println("COMMAND MODE");
+  } else {
+    Globals.ExitCmdMode();
+    Serial.println("TERMINAL MODE");
+  }
 }
 
 void
@@ -506,7 +654,6 @@ loop()
 
   Globals.redLed.loopAction();
   Globals.yellowLed.loopAction();
-
 
   if (Globals.FD()) FD.loopAction();
   if (Globals.SD()) SD.loopAction();
@@ -528,11 +675,11 @@ loop()
   if (Globals.cabinPower()) cabinPower.loopAction();
   if (Globals.remotePower()) remotePower.loopAction();
 
+  theUSBSerial.loopAction();
+
   if (Globals.gprsModem()) gprsModem.loopAction();
   
   if (Globals.Alarm()) theAlarm.loopAction();
-
-  theUSBSerial.loopAction();
 }
 
 
